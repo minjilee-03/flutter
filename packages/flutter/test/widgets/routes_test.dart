@@ -2,13 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(gspencergoog): Remove this tag once this test's state leaks/test
-// dependencies have been fixed.
-// https://github.com/flutter/flutter/issues/85160
-// Fails with "flutter test --test-randomize-ordering-seed=123"
-@Tags(<String>['no-shuffle'])
-
 import 'dart:collection';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -461,6 +456,9 @@ void main() {
       <String>[
       ],
     );
+    await tester.pumpWidget(Container());
+    expect(routes.isEmpty, isTrue);
+    results.clear();
   });
 
   group('PageRouteObserver', () {
@@ -524,6 +522,33 @@ void main() {
 
       expect(pageRouteAware.didPushCount, 2);
       expect(pageRouteAware.didPopCount, 0);
+    });
+
+    test('releases reference to route when unsubscribed', () {
+      final RouteObserver<PageRoute<dynamic>> observer = RouteObserver<PageRoute<dynamic>>();
+      final MockRouteAware pageRouteAware = MockRouteAware();
+      final MockRouteAware page2RouteAware = MockRouteAware();
+      final MockPageRoute pageRoute = MockPageRoute();
+      final MockPageRoute nextPageRoute = MockPageRoute();
+      observer.subscribe(pageRouteAware, pageRoute);
+      observer.subscribe(pageRouteAware, nextPageRoute);
+      observer.subscribe(page2RouteAware, pageRoute);
+      observer.subscribe(page2RouteAware, nextPageRoute);
+      expect(pageRouteAware.didPushCount, 2);
+      expect(page2RouteAware.didPushCount, 2);
+
+      expect(observer.debugObservingRoute(pageRoute), true);
+      expect(observer.debugObservingRoute(nextPageRoute), true);
+
+      observer.unsubscribe(pageRouteAware);
+
+      expect(observer.debugObservingRoute(pageRoute), true);
+      expect(observer.debugObservingRoute(nextPageRoute), true);
+
+      observer.unsubscribe(page2RouteAware);
+
+      expect(observer.debugObservingRoute(pageRoute), false);
+      expect(observer.debugObservingRoute(nextPageRoute), false);
     });
   });
 
@@ -1166,6 +1191,123 @@ void main() {
       expect(route.transitionDuration, isNotNull);
     });
 
+    group('showGeneralDialog avoids overlapping display features', () {
+      testWidgets('positioning with anchorPoint', (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            builder: (BuildContext context, Widget? child) {
+              return MediaQuery(
+                // Display has a vertical hinge down the middle
+                data: const MediaQueryData(
+                  size: Size(800, 600),
+                  displayFeatures: <DisplayFeature>[
+                    DisplayFeature(
+                      bounds: Rect.fromLTRB(390, 0, 410, 600),
+                      type: DisplayFeatureType.hinge,
+                      state: DisplayFeatureState.unknown,
+                    ),
+                  ],
+                ),
+                child: child!,
+              );
+            },
+            home: const Center(child: Text('Test')),
+          ),
+        );
+        final BuildContext context = tester.element(find.text('Test'));
+
+        showGeneralDialog<void>(
+          context: context,
+          pageBuilder: (BuildContext context, _, __) {
+            return const Placeholder();
+          },
+          anchorPoint: const Offset(1000, 0),
+        );
+        await tester.pumpAndSettle();
+
+        // Should take the right side of the screen
+        expect(tester.getTopLeft(find.byType(Placeholder)), const Offset(410.0, 0.0));
+        expect(tester.getBottomRight(find.byType(Placeholder)), const Offset(800.0, 600.0));
+      });
+
+      testWidgets('positioning with Directionality', (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            builder: (BuildContext context, Widget? child) {
+              return MediaQuery(
+                // Display has a vertical hinge down the middle
+                data: const MediaQueryData(
+                  size: Size(800, 600),
+                  displayFeatures: <DisplayFeature>[
+                    DisplayFeature(
+                      bounds: Rect.fromLTRB(390, 0, 410, 600),
+                      type: DisplayFeatureType.hinge,
+                      state: DisplayFeatureState.unknown,
+                    ),
+                  ],
+                ),
+                child: Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: child!,
+                ),
+              );
+            },
+            home: const Center(child: Text('Test')),
+          ),
+        );
+        final BuildContext context = tester.element(find.text('Test'));
+
+        showGeneralDialog<void>(
+          context: context,
+          pageBuilder: (BuildContext context, _, __) {
+            return const Placeholder();
+          },
+        );
+        await tester.pumpAndSettle();
+
+        // Since this is RTL, it should place the dialog on the right screen
+        expect(tester.getTopLeft(find.byType(Placeholder)), const Offset(410.0, 0.0));
+        expect(tester.getBottomRight(find.byType(Placeholder)), const Offset(800.0, 600.0));
+      });
+
+      testWidgets('positioning by default', (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            builder: (BuildContext context, Widget? child) {
+              return MediaQuery(
+                // Display has a vertical hinge down the middle
+                data: const MediaQueryData(
+                  size: Size(800, 600),
+                  displayFeatures: <DisplayFeature>[
+                    DisplayFeature(
+                      bounds: Rect.fromLTRB(390, 0, 410, 600),
+                      type: DisplayFeatureType.hinge,
+                      state: DisplayFeatureState.unknown,
+                    ),
+                  ],
+                ),
+                child: child!,
+              );
+            },
+            home: const Center(child: Text('Test')),
+          ),
+        );
+        final BuildContext context = tester.element(find.text('Test'));
+
+        showGeneralDialog<void>(
+          context: context,
+          pageBuilder: (BuildContext context, _, __) {
+            return const Placeholder();
+          },
+        );
+        await tester.pumpAndSettle();
+
+        // By default it should place the dialog on the left screen
+        expect(tester.getTopLeft(find.byType(Placeholder)), Offset.zero);
+        expect(tester.getBottomRight(find.byType(Placeholder)), const Offset(390.0, 600.0));
+      });
+    });
+
     testWidgets('reverseTransitionDuration defaults to transitionDuration', (WidgetTester tester) async {
       final GlobalKey containerKey = GlobalKey();
 
@@ -1360,9 +1502,9 @@ void main() {
         ),
       ));
 
-      final CurveTween _defaultBarrierTween = CurveTween(curve: Curves.ease);
+      final CurveTween defaultBarrierTween = CurveTween(curve: Curves.ease);
       int _getExpectedBarrierTweenAlphaValue(double t) {
-        return Color.getAlphaFromOpacity(_defaultBarrierTween.transform(t));
+        return Color.getAlphaFromOpacity(defaultBarrierTween.transform(t));
       }
 
       await tester.tap(find.text('X'));
@@ -1423,9 +1565,9 @@ void main() {
         ),
       ));
 
-      final CurveTween _customBarrierTween = CurveTween(curve: Curves.linear);
+      final CurveTween customBarrierTween = CurveTween(curve: Curves.linear);
       int _getExpectedBarrierTweenAlphaValue(double t) {
-        return Color.getAlphaFromOpacity(_customBarrierTween.transform(t));
+        return Color.getAlphaFromOpacity(customBarrierTween.transform(t));
       }
 
       await tester.tap(find.text('X'));
@@ -1486,9 +1628,9 @@ void main() {
         ),
       ));
 
-      final CurveTween _defaultBarrierTween = CurveTween(curve: Curves.ease);
+      final CurveTween defaultBarrierTween = CurveTween(curve: Curves.ease);
       int _getExpectedBarrierTweenAlphaValue(double t) {
-        return Color.getAlphaFromOpacity(_defaultBarrierTween.transform(t));
+        return Color.getAlphaFromOpacity(defaultBarrierTween.transform(t));
       }
 
       await tester.tap(find.text('X'));
@@ -2047,7 +2189,7 @@ Widget buildNavigator({
   TransitionDelegate<dynamic>? transitionDelegate,
 }) {
   return MediaQuery(
-    data: MediaQueryData.fromWindow(WidgetsBinding.instance!.window),
+    data: MediaQueryData.fromWindow(WidgetsBinding.instance.window),
     child: Localizations(
       locale: const Locale('en', 'US'),
       delegates: const <LocalizationsDelegate<dynamic>>[

@@ -25,7 +25,7 @@ void main() {
     setUp(() async {
       tempDir = createResolvedTempDirectorySync('run_test.');
       await project.setUpIn(tempDir);
-      flutter = FlutterRunTestDriver(tempDir, spawnDdsInstance: true);
+      flutter = FlutterRunTestDriver(tempDir);
     });
 
     tearDown(() async {
@@ -62,7 +62,7 @@ void main() {
         validateFlutterVersion(client1),
         validateFlutterVersion(client2)]
       );
-    }, skip: 'DDS failure: https://github.com/dart-lang/sdk/issues/45569');
+    }, skip: true); // https://github.com/flutter/flutter/issues/99003
   });
 
   group('Clients of flutter run on web with DDS disabled', () {
@@ -87,26 +87,6 @@ void main() {
       final VmService client =
         await vmServiceConnectUri('${flutter.vmServiceWsUri}');
       await validateFlutterVersion(client);
-    });
-
-
-    testWithoutContext('can validate flutter version in parallel', () async {
-      await flutter.run(
-        withDebugger: true, chrome: true,
-        additionalCommandArgs: <String>['--verbose', '--web-renderer=html']);
-
-      expect(flutter.vmServiceWsUri, isNotNull);
-
-      final VmService client1 =
-        await vmServiceConnectUri('${flutter.vmServiceWsUri}');
-
-      final VmService client2 =
-        await vmServiceConnectUri('${flutter.vmServiceWsUri}');
-
-      await Future.wait(<Future<void>>[
-        validateFlutterVersion(client1),
-        validateFlutterVersion(client2)]
-      );
     });
   });
 }

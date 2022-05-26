@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// @dart = 2.8
-
 import 'dart:async';
 
 import 'package:dds/dds.dart' as dds;
@@ -15,36 +13,35 @@ import 'logger.dart';
 
 @visibleForTesting
 Future<dds.DartDevelopmentService> Function(
-  Uri,
-  {bool enableAuthCodes,
+  Uri remoteVmServiceUri, {
+  bool enableAuthCodes,
   bool ipv6,
-  Uri serviceUri,
+  Uri? serviceUri,
+  List<String> cachedUserTags,
 }) ddsLauncherCallback = dds.DartDevelopmentService.startDartDevelopmentService;
 
 /// Helper class to launch a [dds.DartDevelopmentService]. Allows for us to
 /// mock out this functionality for testing purposes.
 class DartDevelopmentService {
-  dds.DartDevelopmentService _ddsInstance;
+  dds.DartDevelopmentService? _ddsInstance;
 
-  Uri get uri => _ddsInstance?.uri ?? _existingDdsUri;
-  Uri _existingDdsUri;
+  Uri? get uri => _ddsInstance?.uri ?? _existingDdsUri;
+  Uri? _existingDdsUri;
 
   Future<void> get done => _completer.future;
   final Completer<void> _completer = Completer<void>();
 
   Future<void> startDartDevelopmentService(
-    Uri observatoryUri,
-    int hostPort,
-    bool ipv6,
-    bool disableServiceAuthCodes, {
-    @required Logger logger,
+    Uri observatoryUri, {
+    required Logger logger,
+    int? hostPort,
+    bool? ipv6,
+    bool? disableServiceAuthCodes,
+    bool cacheStartupProfile = false,
   }) async {
     final Uri ddsUri = Uri(
       scheme: 'http',
-      host: (ipv6 ?
-        io.InternetAddress.loopbackIPv6 :
-        io.InternetAddress.loopbackIPv4
-      ).host,
+      host: ((ipv6 ?? false) ? io.InternetAddress.loopbackIPv6 : io.InternetAddress.loopbackIPv4).host,
       port: hostPort ?? 0,
     );
     logger.printTrace(
@@ -55,15 +52,17 @@ class DartDevelopmentService {
       _ddsInstance = await ddsLauncherCallback(
           observatoryUri,
           serviceUri: ddsUri,
-          enableAuthCodes: !disableServiceAuthCodes,
-          ipv6: ipv6,
+          enableAuthCodes: disableServiceAuthCodes != true,
+          ipv6: ipv6 ?? false,
+          // Enables caching of CPU samples collected during application startup.
+          cachedUserTags: cacheStartupProfile ? const <String>['AppStartUp'] : const <String>[],
         );
-      unawaited(_ddsInstance.done.whenComplete(() {
+      unawaited(_ddsInstance?.done.whenComplete(() {
         if (!_completer.isCompleted) {
           _completer.complete();
         }
       }));
-      logger.printTrace('DDS is listening at ${_ddsInstance.uri}.');
+      logger.printTrace('DDS is listening at ${_ddsInstance?.uri}.');
     } on dds.DartDevelopmentServiceException catch (e) {
       logger.printTrace('Warning: Failed to start DDS: ${e.message}');
       if (e.errorCode == dds.DartDevelopmentServiceException.existingDdsInstanceError) {

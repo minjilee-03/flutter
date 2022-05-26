@@ -86,7 +86,7 @@ class WindowsProject extends FlutterProjectPlatform implements CmakeBasedProject
 
 /// The Windows UWP version of the Windows project.
 class WindowsUwpProject extends WindowsProject {
-  WindowsUwpProject.fromFlutter(FlutterProject parent) : super.fromFlutter(parent);
+  WindowsUwpProject.fromFlutter(super.parent) : super.fromFlutter();
 
   @override
   String get _childDirectory => 'winuwp';
@@ -97,13 +97,11 @@ class WindowsUwpProject extends WindowsProject {
   int? get projectVersion => int.tryParse(_editableDirectory.childFile('project_version').readAsStringSync());
 
   /// Retrieve the GUID of the UWP package.
-  String? get packageGuid => _packageGuid ??= getCmakePackageGuid(runnerCmakeFile);
-  String? _packageGuid;
+  late final String? packageGuid = getCmakePackageGuid(runnerCmakeFile);
 
   File get appManifest => _editableDirectory.childDirectory('runner_uwp').childFile('appxmanifest.in');
 
-  String? get packageVersion => _packageVersion ??= parseAppVersion(this);
-  String? _packageVersion;
+  late final String? packageVersion = parseAppVersion(this);
 }
 
 @visibleForTesting

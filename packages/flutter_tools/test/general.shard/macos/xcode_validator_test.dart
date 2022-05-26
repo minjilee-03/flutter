@@ -23,6 +23,7 @@ void main() {
       final XcodeValidator validator = XcodeValidator(xcode: xcode, userMessages: UserMessages());
       final ValidationResult result = await validator.validate();
       expect(result.type, ValidationType.missing);
+      expect(result.statusInfo, isNull);
       expect(result.messages.last.type, ValidationMessageType.error);
       expect(result.messages.last.message, contains('Xcode not installed'));
     });
@@ -55,20 +56,32 @@ void main() {
       final ValidationResult result = await validator.validate();
       expect(result.type, ValidationType.partial);
       expect(result.messages.last.type, ValidationMessageType.error);
+<<<<<<< HEAD
       expect(result.messages.last.message, contains('Flutter requires a minimum Xcode version of 12.0.1'));
+=======
+      expect(result.messages.last.message, contains('Flutter requires Xcode 13 or higher'));
+>>>>>>> fb57da5f945d02ef4f98dfd9409a72b7cce74268
     });
 
     testWithoutContext('Emits partial status when Xcode below recommended version', () async {
       final ProcessManager processManager = FakeProcessManager.any();
       final Xcode xcode = Xcode.test(
         processManager: processManager,
+<<<<<<< HEAD
         xcodeProjectInterpreter: XcodeProjectInterpreter.test(processManager: processManager, version: Version(12, 0, 1)),
+=======
+        xcodeProjectInterpreter: XcodeProjectInterpreter.test(processManager: processManager, version: Version(12, 4, null)),
+>>>>>>> fb57da5f945d02ef4f98dfd9409a72b7cce74268
       );
       final XcodeValidator validator = XcodeValidator(xcode: xcode, userMessages: UserMessages());
       final ValidationResult result = await validator.validate();
       expect(result.type, ValidationType.partial);
       expect(result.messages.last.type, ValidationMessageType.hint);
+<<<<<<< HEAD
       expect(result.messages.last.message, contains('Flutter recommends a minimum Xcode version of 12.0.2'));
+=======
+      expect(result.messages.last.message, contains('Flutter recommends a minimum Xcode version of 13'));
+>>>>>>> fb57da5f945d02ef4f98dfd9409a72b7cce74268
     }, skip: true); // [intended] Unskip and update when minimum and required check versions diverge.
 
     testWithoutContext('Emits partial status when Xcode EULA not signed', () async {
@@ -182,6 +195,11 @@ void main() {
       final XcodeValidator validator = XcodeValidator(xcode: xcode, userMessages: UserMessages());
       final ValidationResult result = await validator.validate();
       expect(result.type, ValidationType.installed);
+      expect(result.messages.length, 1);
+      final ValidationMessage firstMessage = result.messages.first;
+      expect(firstMessage.type, ValidationMessageType.information);
+      expect(firstMessage.message, 'Xcode at /Library/Developer/CommandLineTools');
+      expect(result.statusInfo, '1000.0.0');
     });
   });
 }
